@@ -576,6 +576,16 @@ SafeStorageHandleStore(
         goto Cleanup;
     }
 
+    if (!ValidatePathNotInOtherUserDirectory(canonicalSourcePath))
+    {
+        printf("Cannot store files from another user's directory.\n");
+        LogAuditEventFormatted(AUDIT_SECURITY_VIOLATION, g_State.CurrentUsername,
+                              STATUS_ACCESS_DENIED,
+                              "Attempted to access another user's directory: %s", canonicalSourcePath);
+        status = STATUS_ACCESS_DENIED;
+        goto Cleanup;
+    }
+
     if (!CheckFileSizeLimit(canonicalSourcePath, &fileSize))
     {
         printf("File exceeds maximum size limit of 8 GB.\n");
@@ -814,6 +824,16 @@ SafeStorageHandleRetrieve(
         LogAuditEvent(AUDIT_SECURITY_VIOLATION, g_State.CurrentUsername, 
                      "Symlink detected in source", STATUS_INVALID_PARAMETER);
         status = STATUS_INVALID_PARAMETER;
+        goto Cleanup;
+    }
+
+    if (!ValidatePathNotInOtherUserDirectory(canonicalDestPath))
+    {
+        printf("Cannot retrieve files to another user's directory.\n");
+        LogAuditEventFormatted(AUDIT_SECURITY_VIOLATION, g_State.CurrentUsername,
+                              STATUS_ACCESS_DENIED,
+                              "Attempted to write to another user's directory: %s", canonicalDestPath);
+        status = STATUS_ACCESS_DENIED;
         goto Cleanup;
     }
 

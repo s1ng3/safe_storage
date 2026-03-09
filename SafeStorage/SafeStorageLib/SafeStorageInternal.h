@@ -135,6 +135,12 @@ ValidatePathBelongsToCurrentUser(
     _In_z_ const char* Path
 );
 
+_Must_inspect_result_
+BOOL
+ValidatePathNotInOtherUserDirectory(
+    _In_z_ const char* Path
+);
+
 EXTERN_C_END;
 
 #endif // _SAFE_STORAGE_INTERNAL_H_

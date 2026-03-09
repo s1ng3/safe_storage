@@ -685,6 +685,99 @@ GetUserDirectoryPath(
 
 _Must_inspect_result_
 BOOL
+ValidatePathNotInOtherUserDirectory(
+    _In_z_ const char* Path
+)
+{
+    char canonicalPath[MAX_PATH];
+    char canonicalUsersDir[MAX_PATH];
+    DWORD result;
+    size_t usersDirLen;
+
+    if (Path == NULL)
+    {
+        return FALSE;
+    }
+
+    result = GetFullPathNameA(Path, MAX_PATH, canonicalPath, NULL);
+    if (result == 0 || result >= MAX_PATH)
+    {
+        printf("Failed to get canonical path.\n");
+        return FALSE;
+    }
+
+    result = GetFullPathNameA(g_State.UsersDirectory, MAX_PATH, canonicalUsersDir, NULL);
+    if (result == 0 || result >= MAX_PATH)
+    {
+        printf("Failed to get canonical users directory path.\n");
+        return FALSE;
+    }
+
+    usersDirLen = strlen(canonicalUsersDir);
+
+    if (_strnicmp(canonicalPath, canonicalUsersDir, usersDirLen) != 0)
+    {
+        return TRUE;
+    }
+
+    if (strlen(canonicalPath) <= usersDirLen)
+    {
+        return TRUE;
+    }
+
+    char nextChar = canonicalPath[usersDirLen];
+    if (nextChar != '\\' && nextChar != '/')
+    {
+        return TRUE;
+    }
+
+    char expectedUserDir[MAX_PATH];
+    char canonicalUserDir[MAX_PATH];
+    HRESULT hr;
+
+    hr = StringCchPrintfA(
+        expectedUserDir,
+        MAX_PATH,
+        "%s\\%s",
+        g_State.UsersDirectory,
+        g_State.CurrentUsername
+    );
+
+    if (FAILED(hr))
+    {
+        return FALSE;
+    }
+
+    result = GetFullPathNameA(expectedUserDir, MAX_PATH, canonicalUserDir, NULL);
+    if (result == 0 || result >= MAX_PATH)
+    {
+        printf("Failed to get canonical user directory path.\n");
+        return FALSE;
+    }
+
+    size_t userDirLen = strlen(canonicalUserDir);
+
+    if (_strnicmp(canonicalPath, canonicalUserDir, userDirLen) == 0)
+    {
+        if (strlen(canonicalPath) == userDirLen)
+        {
+            return TRUE;
+        }
+
+        char nextUserChar = canonicalPath[userDirLen];
+        if (nextUserChar == '\\' || nextUserChar == '/' || nextUserChar == '\0')
+        {
+            return TRUE;
+        }
+    }
+
+    printf("Security violation: Access to another user's directory is not allowed.\n");
+    printf("Path: %s\n", canonicalPath);
+    return FALSE;
+}
+
+_Must_inspect_result_
+BOOL
 ValidatePathBelongsToCurrentUser(
     _In_z_ const char* Path
 )

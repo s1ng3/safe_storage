@@ -1,26 +1,6 @@
 ﻿#include "includes.h"
 #include "Commands.h"
 
-
-/*
- * @brief       You must not modify this file or this project (SafeStorage).
- *              All changes made to this file should only be for testing that you have fixed all vulnerabilities.
- *
- *              Your main responsibility will be to implement the missing functionality in SafeStorageLib.
- *              All new files will be created in the SafeStorageLib project.
- *
- *              In this file, you must identify all vulnerabilities.
- *              A file named "vulnerabilities.txt" will be delivered alongside the project.
- *              The file will list the identified vulnerabilities, the line(s) where they are found, their impact, and how to fix them.
- *
- * @note        For bonus points, you can use SAL: https://learn.microsoft.com/en-us/cpp/code-quality/understanding-sal?view=msvc-170
- *              To run SAL: right-click on the entire solution Solution 'SafeStorage' (2 of 2 projects),
- *                          go to "Analyze and Code Cleanup",
- *                          and select "Run Code Analysis on Solution."
- *              You can add SAL annotations to all functions (both existing ones and those you will create).
- */
-
-
 static void
 PrintHelp()
 {
