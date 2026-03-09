@@ -1,0 +1,169 @@
+SafeStorage Vulnerability Report
+
+===========================================================
+VULNERABILITY #1: Buffer Overflow (usage of unsafe scanf())
+===========================================================
+Location: Lines 54, 58, 59, 66, 67, 79, 80, 87, 88
+
+The code uses scanf("%s", buffer) to read user input without any bounds checking.
+This allows an attacker to overflow the buffers (command, arg1, arg2) by providing
+input longer than the allocated buffer size.
+
+Affected Lines:
+    Line 54:  scanf("%s", command); // command buffer is only 10 bytes
+    Line 58:  scanf("%s", arg1);    // arg1 buffer is MAX_PATH (260 bytes)
+    Line 59:  scanf("%s", arg2);    // arg2 buffer is MAX_PATH (260 bytes)
+    Line 66:  scanf("%s", arg1);    // etc for this call
+    Line 67:  scanf("%s", arg2);    // etc for this call
+    Line 79:  scanf("%s", arg1);    // etc for this call
+    Line 80:  scanf("%s", arg2);    // etc for this call
+    Line 87:  scanf("%s", arg1);    // etc for this call
+    Line 88:  scanf("%s", arg2);    // etc for this call
+
+This leads to privilege escalation and memory corruption.
+
+We must replace all scanf("%s", ...) calls with safer alternatives (safe functions):
+
+We can fix it by using the function scanf_s :
+    scanf_s("%s", command, (rsize_t)sizeof(command));
+    scanf_s("%s", arg1, (rsize_t)sizeof(arg1));
+    scanf_s("%s", arg2, (rsize_t)sizeof(arg2));
+etc.
+
+=============================================
+VULNERABILITY #2: Incorrect Usage of memcmp()
+=============================================
+Location: Lines 56, 64, 72, 77, 85, 93
+
+The code uses memcmp() with sizeof("string") which includes the null terminator
+in the comparison. This will fail in long term usage.
+
+For example:
+    memcmp(command, "register", sizeof("register"))
+
+This compares 9 bytes (including '\0'), so "register" typed by user will only
+match if the 9th byte in command buffer happens to be '\0'.
+
+Affected Lines:
+    Line 56:  memcmp(command, "register", sizeof("register"))
+    Line 64:  memcmp(command, "login", sizeof("login"))
+    Line 72:  memcmp(command, "logout", sizeof("logout"))
+    Line 77:  memcmp(command, "store", sizeof("store"))
+    Line 85:  memcmp(command, "retrieve", sizeof("retrieve"))
+    Line 93:  memcmp(command, "exit", sizeof("exit"))
+
+Commands may not be recognized correctly and might be accepted with garbage data after them.
+
+We should replace memcmp with strcmp() or use memcmp with strlen():
+
+    if (strcmp(command, "register") == 0)
+    if (strncmp(command, "register", strlen("register")) == 0)
+
+==================================
+VULNERABILITY #3: Cast to uint16_t
+==================================
+Location: Lines 62, 70, 83, 91
+
+Description:
+It casts strlen() results to uint16_t without validation. If a string leads to buffer overflow,
+the length cause incorrect behavior in the handler functions.
+
+Affected Lines:
+    Line 62:  (uint16_t)strlen(arg1)
+    Line 62:  (uint16_t)strlen(arg2)
+    Line 70:  (uint16_t)strlen(arg1)
+    Line 70:  (uint16_t)strlen(arg2)
+    Line 83:  (uint16_t)strlen(arg2)
+    Line 83:  (uint16_t)strlen(arg1)
+    Line 91:  (uint16_t)strlen(arg2)
+    Line 91:  (uint16_t)strlen(arg1)
+
+It could lead to potential buffer over-read in handler functions.
+
+We should add range validation before casting:
+
+    size_t len = strlen(arg1);
+    if (len > UINT16_MAX) {
+        printf("Error: Input too long\n");
+        continue;
+    }
+    uint16_t argLen = (uint16_t)len;
+
+===========================================================
+VULNERABILITY #4: Missing Input Validation and Sanitization
+===========================================================
+Location: Lines 37-106
+
+The main() function does not validate or sanitize user input before passing it
+to handler functions.
+
+It doesn't check for null pointers on arg1, arg2, path traversal etc. 
+so that it could lead to path traversal and information leakage.
+
+We should validate input before calling handlers in order 
+to check for path traversal and clear sensitive buffers after use while also adding null checks.
+
+Adding SAL annotations could also help!
+
+========================================
+VULNERABILITY #5: Information Disclosure
+========================================
+Location: Lines 61, 69
+
+The code prints passwords in cleartext to the console, which is a security risk.
+Passwords should never be displayed in logs or console output, even in debug mode.
+
+Affected Lines:
+    Line 61:  printf("register with username [%s] password [%s] \r\n", arg1, arg2);
+    Line 69:  printf("login with username [%s] password [%s] \r\n", arg1, arg2);
+
+It should lead to password exposure through console logs and lead to surfing attacks.
+We should use secure logging by removing the password from console output or masking it
+with special characters used for passwords such as '*'.
+
+===========================================================
+VULNERABILITY #6: No Input Buffer Clearing Between Commands
+===========================================================
+Location: At the entry in the main loop
+
+The buffers (command, arg1, arg2) are not cleared between loop iterations.
+It could lead to leak information.
+
+We should clear buffers at the start of each loop iteration.
+
+    do {
+        SecureZeroMemory(command, sizeof(command));
+        SecureZeroMemory(arg1, sizeof(arg1));
+        SecureZeroMemory(arg2, sizeof(arg2));
+        
+        printf("Enter your command: \r\n");
+        scanf_s("%9s", command, (rsize_t)sizeof(command));
+        //code
+    } while (TRUE);
+
+===========================================================
+VULNERABILITY #7: No Error Checking on scanf() Return Value
+===========================================================
+Location: Where scanf() is used
+
+The code does not check the return value of scanf().
+It could lead to use of uninitialized data.
+
+We should check scanf return value.
+
+=================================
+VULNERABILITY #8: Race Conditions
+=================================
+Location: Handler function calls throughout main loop
+
+If the SafeStorageLib uses global state to track the 
+logged-in user, and if multiple instances of the application 
+can run, there's potential for race conditions.
+
+So there might appear the issue where multiple users log in
+simultaneously which could lead to file access conflicts and
+data corruption.
+
+We should implement proper locking mechanisms (CreateMutex)
+in SafeStorageLib and use file locking to ensure only one 
+instance runs at a time.
